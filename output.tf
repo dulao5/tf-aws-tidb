@@ -31,3 +31,7 @@ output "tidb_bastion_keypair_private_key" {
   value = "${module.key_pair_tidb_bastion.private_key_openssh}"
   sensitive = true
 }
+
+output "nlb-endpoint" {
+  value = "${module.nlb_internal_tidb.lb_dns_name}"
+}

@@ -62,6 +62,16 @@ module "security_group_internal_tidb" {
     }
   ]
 
+  ingress_with_cidr_blocks = [
+    {
+        from_port   = 4000
+        to_port     = 4000
+        description = "tidb port"
+        protocol    = "tcp"
+        cidr_blocks = join(",", var.aws_private_subnets)
+    }
+  ]
+
   egress_rules      = ["all-all"]
 
   tags = var.tags
@@ -162,6 +172,8 @@ module "ec2_bastion"{
     echo "${module.key_pair_tidb_internal.private_key_openssh}" > ~ec2-user/.ssh/id_rsa
     chmod 600 ~ec2-user/.ssh/id_rsa
     chown -R ec2-user:ec2-user ~ec2-user/.ssh
+    sudo yum install -y mariadb-server 
+    curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
   EOF
 }
 
@@ -387,6 +399,42 @@ module "elb_internal_tidb" {
   ]
   number_of_instances = var.tidb_count
   instances = module.ec2_internal_tidb.*.id
+}
+
+module "nlb_internal_tidb" {
+  source              = "terraform-aws-modules/alb/aws"
+  name                = "${var.name_prefix}-internal-nlb-tidb"
+  load_balancer_type  = "network"
+  vpc_id              = module.vpc.vpc_id
+  subnets             = module.vpc.private_subnets
+  internal            = true
+  target_groups = [
+    {
+      name_prefix         = "nlb-"
+      backend_protocol    = "TCP"
+      backend_port        = 4000
+      target_type         = "instance"
+      preserve_client_ip  = false
+      targets = {
+        for i,instance in module.ec2_internal_tidb : 
+          "target-${i}" => {
+            target_id = instance.id
+            port = 4000
+          }
+      }
+    }
+  ]
+  http_tcp_listeners = [
+    {
+      port                = 4000
+      protocol            = "TCP"
+      target_group_index  = 0
+    }
+  ]
+
+  depends_on = [
+    module.ec2_internal_tidb
+  ]
 }
 
 ## make tidb cluster config from template
