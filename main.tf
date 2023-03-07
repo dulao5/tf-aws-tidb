@@ -385,6 +385,7 @@ module "elb_internal_tidb" {
   depends_on = [
     module.ec2_internal_tidb
   ]
+  number_of_instances = var.tidb_count
   instances = module.ec2_internal_tidb.*.id
 }
 
