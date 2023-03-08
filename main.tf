@@ -22,7 +22,6 @@ module "vpc" {
   tags = var.tags
 }
 
-
 module "security_group_bastion" {
   source  = "terraform-aws-modules/security-group/aws"
   version = "~> 4.0"
@@ -83,12 +82,29 @@ module "security_group_internal_tidb_load_balancer" {
         description = "tidb port"
         protocol    = "tcp"
         cidr_blocks = join(",", var.tidb_lb_allow_from)
+    },
+    {
+        from_port   = 3000
+        to_port     = 3000
+        description = "grafana port"
+        protocol    = "tcp"
+        cidr_blocks = join(",", var.tidb_lb_allow_from)
     }
   ]
 
   egress_rules      = ["all-all"]
 
   tags = var.tags
+}
+
+module "security_group_public_https" {
+  source  = "terraform-aws-modules/security-group/aws//modules/https-443"
+
+  name        = "${var.name_prefix}-public-https"
+  description = "public https security group (allow 443 port)"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_cidr_blocks = ["0.0.0.0/0"]
 }
 
 # key pair settings
@@ -339,7 +355,8 @@ module "ec2_internal_monitor" {
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.monitor_instance_type
   subnet_id                   = element(module.vpc.private_subnets, count.index % length(module.vpc.private_subnets))
-  vpc_security_group_ids      = [module.security_group_internal_tidb.security_group_id]
+  vpc_security_group_ids      = [module.security_group_internal_tidb.security_group_id,
+                                 module.security_group_internal_tidb_load_balancer.security_group_id]
   associate_public_ip_address = false
   key_name                    = module.key_pair_tidb_internal.key_pair_name
 
@@ -365,7 +382,7 @@ module "nlb_internal_tidb" {
   internal            = true
   target_groups = [
     {
-      name_prefix         = "nlb-"
+      name_prefix         = "tidb-"
       backend_protocol    = "TCP"
       backend_port        = 4000
       target_type         = "instance"
@@ -377,13 +394,32 @@ module "nlb_internal_tidb" {
             port = 4000
           }
       }
-    }
+      },
+          {
+        name_prefix         = "gra-"
+        backend_protocol    = "TCP"
+        backend_port        = 3000
+        target_type         = "instance"
+        preserve_client_ip  = false
+        targets = {
+          for i,instance in module.ec2_internal_monitor : 
+            "target-${i}" => {
+              target_id = instance.id
+              port = 3000
+            }
+        }
+      }
   ]
   http_tcp_listeners = [
     {
       port                = 4000
       protocol            = "TCP"
       target_group_index  = 0
+    },
+    {
+      port                = 3000
+      protocol            = "TCP"
+      target_group_index  = 1
     }
   ]
 
@@ -391,6 +427,50 @@ module "nlb_internal_tidb" {
     module.ec2_internal_tidb
   ]
 }
+
+# API Gateway for export Grafana dashboard
+module "api_gateway" {
+  source = "terraform-aws-modules/apigateway-v2/aws"
+
+  name          = "${var.name_prefix}-api-gateway"
+  description   = "HTTP API Gateway with VPC links"
+  protocol_type = "HTTP"
+
+  cors_configuration = {
+    allow_headers = ["content-type", "x-amz-date", "authorization", "x-api-key", "x-amz-security-token", "x-amz-user-agent"]
+    allow_methods = ["*"]
+    allow_origins = ["*"]
+  }
+
+  create_api_domain_name = false
+
+  integrations = {
+    "ANY /" = {
+      connection_type    = "VPC_LINK"
+      vpc_link           = "my-vpc"
+      integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[1]
+      integration_type   = "HTTP_PROXY"
+      integration_method = "ANY"
+    },
+    "ANY /{proxy+}" = {
+      connection_type    = "VPC_LINK"
+      vpc_link           = "my-vpc"
+      integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[1]
+      integration_type   = "HTTP_PROXY"
+      integration_method = "ANY"
+    }
+  }
+
+  vpc_links = {
+    my-vpc = {
+      name               = "${var.name_prefix}-vpclink"
+      security_group_ids = [module.security_group_public_https.security_group_id,
+                            module.security_group_internal_tidb.security_group_id]
+      subnet_ids         = module.vpc.private_subnets
+    }
+  }
+}
+
 
 ## make tidb cluster config from template
 resource "local_file" "tidb_cluster_config" {

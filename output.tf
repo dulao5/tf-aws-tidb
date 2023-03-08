@@ -18,12 +18,20 @@ output "monitor" {
   value = "${join("\n", module.ec2_internal_monitor.*.private_ip)}"
 }
 
+output "monitor-url" {
+  value = "${join("\n", module.ec2_internal_monitor.*.private_dns)}"  
+}
+
 output "ticdc" {
   value = "${join("\n", module.ec2_internal_ticdc.*.private_ip)}"
 }
 
 output "bastion_ip" {
   value = "${join("\n", module.ec2_bastion.*.public_ip)}"
+}
+
+output "grafana_url" {
+  value = "${module.api_gateway.apigatewayv2_api_api_endpoint}"
 }
 
 # tidb_bastion keypair private key
