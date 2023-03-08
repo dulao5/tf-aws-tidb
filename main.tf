@@ -163,8 +163,6 @@ module "ec2_bastion"{
     chmod 600 ~ec2-user/.ssh/id_rsa
     chown -R ec2-user:ec2-user ~ec2-user/.ssh
     sudo yum install -y mariadb-server 
-    curl --proto '=https' --tlsv1.2 -sSfO https://tiup-mirrors.pingcap.com/install.sh
-    sh install.sh
   EOF
 }
 
@@ -408,22 +406,37 @@ resource "local_file" "tidb_cluster_config" {
   file_permission = "0644"
 }
 
+resource "local_file" "connect_script" {
+  content = templatefile("${path.module}/files/connect.sh.tpl", {
+    bastion_public_ip: module.ec2_bastion.public_ip,
+    nlb_internal_tidb: module.nlb_internal_tidb.lb_dns_name
+  })
+  filename = "${path.module}/connect.sh"
+  file_permission = "0755"
+}
+
 resource "null_resource" "bastion-inventory" {
   depends_on = [resource.local_file.tidb_cluster_config]
 
   # Changes to any instance of the bastion requires re-provisioning
   triggers = resource.local_file.tidb_cluster_config
 
+  connection {
+    type        = "ssh"
+    user        = "ec2-user"
+    private_key = "${module.key_pair_tidb_bastion.private_key_openssh}"
+    host        = element(module.ec2_bastion.*.public_ip, 0)
+  }
+
   provisioner "file" {
     source      = resource.local_file.tidb_cluster_config.filename
     destination = "/home/ec2-user/tiup-topology.yaml"
+  }
 
-    connection {
-      type        = "ssh"
-      user        = "ec2-user"
-      private_key = "${module.key_pair_tidb_bastion.private_key_openssh}"
-      host        = element(module.ec2_bastion.*.public_ip, 0)
-    }
+  provisioner "remote-exec" {
+    inline = [
+      "curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh"
+    ]
   }
 }
 
