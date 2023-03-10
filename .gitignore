@@ -6,4 +6,5 @@
 *.tfstate
 *.tfstate.backup
 tiup-topology.yaml
+connect.sh
 .DS_Store
