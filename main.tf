@@ -89,6 +89,13 @@ module "security_group_internal_tidb_load_balancer" {
         description = "grafana port"
         protocol    = "tcp"
         cidr_blocks = join(",", var.tidb_lb_allow_from)
+    },
+    {
+        from_port   = 2379
+        to_port     = 2379
+        description = "tidb dashboard port"
+        protocol    = "tcp"
+        cidr_blocks = join(",", var.tidb_lb_allow_from)
     }
   ]
 
@@ -266,7 +273,8 @@ module "ec2_internal_pd" {
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.pd_instance_type
   subnet_id                   = element(module.vpc.private_subnets, count.index % length(module.vpc.private_subnets))
-  vpc_security_group_ids      = [module.security_group_internal_tidb.security_group_id]
+  vpc_security_group_ids      = [module.security_group_internal_tidb.security_group_id,
+                                 module.security_group_internal_tidb_load_balancer.security_group_id]
   associate_public_ip_address = false
   key_name                    = module.key_pair_tidb_internal.key_pair_name
 
@@ -380,6 +388,7 @@ module "nlb_internal_tidb" {
   vpc_id              = module.vpc.vpc_id
   subnets             = module.vpc.private_subnets
   internal            = true
+  enable_cross_zone_load_balancing = true
   target_groups = [
     {
       name_prefix         = "tidb-"
@@ -394,21 +403,45 @@ module "nlb_internal_tidb" {
             port = 4000
           }
       }
-      },
-          {
-        name_prefix         = "gra-"
-        backend_protocol    = "TCP"
-        backend_port        = 3000
-        target_type         = "instance"
-        preserve_client_ip  = false
-        targets = {
-          for i,instance in module.ec2_internal_monitor : 
-            "target-${i}" => {
-              target_id = instance.id
-              port = 3000
-            }
-        }
+    },
+    {
+      name_prefix         = "gra-"
+      backend_protocol    = "TCP"
+      backend_port        = 3000
+      target_type         = "instance"
+      preserve_client_ip  = false
+      targets = {
+        for i,instance in module.ec2_internal_monitor : 
+          "target-${i}" => {
+            target_id = instance.id
+            port = 3000
+          }
       }
+    },
+    {
+      name_prefix         = "dash-"
+      backend_protocol    = "TCP"
+      backend_port        = 2379
+      target_type         = "instance"
+      preserve_client_ip  = false
+      targets = {
+        for i,instance in module.ec2_internal_pd : 
+          "target-${i}" => {
+            target_id = instance.id
+            port = 2379
+          }
+      }
+      health_check = {
+        enabled             = true
+        protocol            = "HTTP"
+        matcher             = "200"
+        interval            = 10
+        path                = "/dashboard/"
+        healthy_threshold   = 3
+        unhealthy_threshold = 3
+        timeout             = 6
+      }
+    },
   ]
   http_tcp_listeners = [
     {
@@ -420,7 +453,12 @@ module "nlb_internal_tidb" {
       port                = 3000
       protocol            = "TCP"
       target_group_index  = 1
-    }
+    },
+    {
+      port                = 2379
+      protocol            = "TCP"
+      target_group_index  = 2
+    },    
   ]
 
   depends_on = [
@@ -429,10 +467,10 @@ module "nlb_internal_tidb" {
 }
 
 # API Gateway for export Grafana dashboard
-module "api_gateway" {
+module "api_gateway_grafana" {
   source = "terraform-aws-modules/apigateway-v2/aws"
 
-  name          = "${var.name_prefix}-api-gateway"
+  name          = "${var.name_prefix}-api-gateway-grafana"
   description   = "HTTP API Gateway with VPC links"
   protocol_type = "HTTP"
 
@@ -458,12 +496,12 @@ module "api_gateway" {
       integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[1]
       integration_type   = "HTTP_PROXY"
       integration_method = "ANY"
-    }
+    },
   }
 
   vpc_links = {
     my-vpc = {
-      name               = "${var.name_prefix}-vpclink"
+      name               = "${var.name_prefix}-grafana-vpclink"
       security_group_ids = [module.security_group_public_https.security_group_id,
                             module.security_group_internal_tidb.security_group_id]
       subnet_ids         = module.vpc.private_subnets
@@ -471,6 +509,48 @@ module "api_gateway" {
   }
 }
 
+# API Gateway for export Grafana dashboard
+module "api_gateway_tidash" {
+  source = "terraform-aws-modules/apigateway-v2/aws"
+
+  name          = "${var.name_prefix}-api-gateway-tidash"
+  description   = "HTTP API Gateway with VPC links"
+  protocol_type = "HTTP"
+
+  cors_configuration = {
+    allow_headers = ["content-type", "x-amz-date", "authorization", "x-api-key", "x-amz-security-token", "x-amz-user-agent"]
+    allow_methods = ["*"]
+    allow_origins = ["*"]
+  }
+
+  create_api_domain_name = false
+
+  integrations = {
+    "ANY /" = {
+      connection_type    = "VPC_LINK"
+      vpc_link           = "my-vpc"
+      integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[2]
+      integration_type   = "HTTP_PROXY"
+      integration_method = "ANY"
+    },
+    "ANY /{proxy+}" = {
+      connection_type    = "VPC_LINK"
+      vpc_link           = "my-vpc"
+      integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[2]
+      integration_type   = "HTTP_PROXY"
+      integration_method = "ANY"
+    },
+  }
+
+  vpc_links = {
+    my-vpc = {
+      name               = "${var.name_prefix}-tidash-vpclink"
+      security_group_ids = [module.security_group_public_https.security_group_id,
+                            module.security_group_internal_tidb.security_group_id]
+      subnet_ids         = module.vpc.private_subnets
+    }
+  }
+}
 
 ## make tidb cluster config from template
 resource "local_file" "tidb_cluster_config" {
