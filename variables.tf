@@ -44,17 +44,17 @@ variable "aws_public_subnets" {
 
 variable "tidb_instance_type" {
  type    = string
- default = "t2.medium" // prod "c4.4xlarge"
+ default = "c5.2xlarge" // on tidbcloud : 8C16G/c5.2xlarge , 16C32G/c5.4xlarge
 }
 
 variable "tikv_instance_type" {
   type    = string
-  default = "t2.medium" // prod : "i3.2xlarge"
+  default = "m5.2xlarge" // on tidbcloud : 8C32G/m5.2xlarge , 16C64G/m5.4xlarge
 }
 
 variable "pd_instance_type" {
   type    = string
-  default = "t2.medium"
+  default = "c5.xlarge" // on tidbcloud : 4C/c5.xlarge , 8C/c5.2xlarge
 }
 
 variable "monitor_instance_type" {
@@ -76,17 +76,22 @@ variable "bastion_instance_type" {
 
 variable "root_disk_size" {
   type    = number
-  default = 100
+  default = 150
 }
 
 variable "tikv_data_disk_size" {
   type    = number
-  default = 200
+  default = 500
+}
+
+variable "tikv_data_disk_iops" {
+  type   = number
+  default = 4000 # default 4000 on tidbcloud
 }
 
 variable "tikv_data_disk_throughput" {
   type    = number
-  default = 200
+  default = 288 # default 288MB/s on tidbcloud
 }
 
 variable "pd_data_disk_size" {
@@ -132,7 +137,7 @@ variable "pd_count" {
 variable "ticdc_count" {
   type = number
   description = "The numble of the ticdc worker instances to be deployed"
-  default = 2
+  default = 0
 }
 
 ## tags 
@@ -142,6 +147,7 @@ variable "tags" {
     default = {
         "Owner" = "tf-aws-tidb",
         "Project" = "AWS TiDB Cluster",
+        "Environment" = "test",
     }
     description = "The tags to be added to the resources"
 }

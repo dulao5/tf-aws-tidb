@@ -4,7 +4,7 @@
 # https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws/latest
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "3.3.0"
+  version = "5.0.0"
 
   name = "${var.name_prefix}-vpc-${var.aws_region}"
 
@@ -247,6 +247,7 @@ module "ec2_internal_tikv" {
       device_name = "/dev/sdf"
       volume_type = "gp3"
       volume_size = var.tikv_data_disk_size
+      iops        = var.tikv_data_disk_iops
       throughput  = var.tikv_data_disk_throughput
     }
   ]
@@ -254,9 +255,9 @@ module "ec2_internal_tikv" {
   # user data : init tikv data disk
   user_data = <<-EOF
     #!/bin/bash
-    mkfs -t ext4 /dev/xvdf
+    mkfs -t ext4 /dev/sdf
     mkdir -p /data
-    echo "/dev/xvdf /data ext4 defaults,nofail,noatime,nodelalloc 0 2" >> /etc/fstab
+    echo "/dev/sdf /data ext4 defaults,nofail,noatime,nodelalloc 0 2" >> /etc/fstab
     mount -a
     chown -R ec2-user:ec2-user /data
   EOF
@@ -299,9 +300,9 @@ module "ec2_internal_pd" {
 
   user_data = <<-EOF
     #!/bin/bash
-    mkfs -t ext4 /dev/xvdf
+    mkfs -t ext4 /dev/sdf
     mkdir -p /data
-    echo "/dev/xvdf /data ext4 defaults,nofail,noatime,nodelalloc 0 2" >> /etc/fstab
+    echo "/dev/sdf /data ext4 defaults,nofail,noatime,nodelalloc 0 2" >> /etc/fstab
     mount -a
     chown -R ec2-user:ec2-user /data
   EOF
@@ -344,9 +345,9 @@ module "ec2_internal_ticdc" {
 
   user_data = <<-EOF
     #!/bin/bash
-    mkfs -t ext4 /dev/xvdf
+    mkfs -t ext4 /dev/sdf
     mkdir -p /data
-    echo "/dev/xvdf /data ext4 defaults,nofail,noatime,nodelalloc 0 2" >> /etc/fstab
+    echo "/dev/sdf /data ext4 defaults,nofail,noatime,nodelalloc 0 2" >> /etc/fstab
     mount -a
     chown -R ec2-user:ec2-user /data
   EOF

@@ -25,11 +25,24 @@ monitored:
 # #           ^       ^
 # # - example: https://github.com/pingcap/tiup/blob/master/examples/topology.example.yaml.
 # # You can overwrite this configuration via the instance-level `config` field.
-# server_configs:
-  # tidb:
-  # tikv:
+server_configs:
+  tidb:
+    mem-quota-query: 2147483648 # 2GiB , tidbcloud : 8C16G/c5.2xlarge tidb configs
+  tikv: # tidbcloud 8C32G/m5.2xlarge tikv configs
+    server.grpc-concurrency: 3
+    raftstore.apply-pool-size: 1
+    raftstore.store-pool-size: 1
+    rocksdb.defaultcf.max-write-buffer-number: 10
+    rocksdb.writecf.max-write-buffer-number: 10
+    rocksdb.lockcf.max-write-buffer-number: 10
+    storage.io-rate-limit.max-bytes-per-sec: 301465600 # The baseline throughput of m5.2xlarge with EBS is 287.5MB/s.
+    # storage.io-rate-limit.max-bytes-per-sec: 622592000 # The baseline throughput of m5.4xlarge with EBS is 593.75/s.
+    backup.num-threads: 3
+    backup.s3-multi-part-size: "30MB"
   # pd:
-  # tiflash:
+  tiflash:
+    storage.io_rate_limit.max_bytes_per_sec: 301465600 # The baseline throughput of r5.2xlarge with EBS is 287.5MB/s.
+    # storage.io_rate_limit.max_bytes_per_sec: 301465600 # The baseline throughput of r5.2xlarge with EBS is 287.5MB/s.
   # tiflash-learner:
 
 # # Server configs are used to specify the configuration of PD Servers.

@@ -36,8 +36,6 @@ To access the bastion host, use the following command, replacing `$bastion_ip` w
 ```
 ssh -i $keyfile ec2-user@$bastion_ip
 
-curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
-source /home/ec2-user/.bash_profile 
 tiup --version
 
 tiup cluster check tiup-topology.yaml
