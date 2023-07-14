@@ -15,7 +15,8 @@ ssh -i ~/.ssh/tidb-test-bastion ec2-user@${bastion_public_ip}
 ## cluster deploy
 # 
 # tiup cluster deploy <cluster-name> <version> tiup-topology.yaml
-# tiup cluster start test-tidb --init
+# tiup cluster start <cluster-name> --init
 
 ## connect tidb
+# terraform output # output nlb_internal_tidb
 # mysql --user root --port 4000 --host ${nlb_internal_tidb} -p 
