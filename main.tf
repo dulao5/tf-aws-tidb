@@ -14,7 +14,14 @@ module "vpc" {
   private_subnets = var.aws_private_subnets
   public_subnets  = var.aws_public_subnets
 
-  enable_nat_gateway = true
+  # TiDB instances located in private subnets typically have reduced need for external network access. 
+  # Both "tiup cluster deploy" and "tiup check -apply" commands do not necessitate external network access. 
+  # Consequently, the deactivation of the nat-gateway could result in cost savings.
+  # 
+  # In cases where nat-gateway usage is preferred, 
+  # "single_nat_gateway=true" can be employed, 
+  # as intermittent access to the nat-gateway does not mandate its high availability.
+  enable_nat_gateway = false
 
   enable_dns_hostnames = true
   enable_dns_support   = true
