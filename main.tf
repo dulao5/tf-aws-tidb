@@ -391,6 +391,7 @@ module "ec2_internal_monitor" {
 // Load Balancer (NLB) (backend: internal tidb ec2 instances)
 module "nlb_internal_tidb" {
   source              = "terraform-aws-modules/alb/aws"
+  version             = "8.7.0"
   name                = "${var.name_prefix}-internal-nlb-tidb"
   load_balancer_type  = "network"
   vpc_id              = module.vpc.vpc_id
