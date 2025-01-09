@@ -146,7 +146,7 @@ data "aws_ami" "amazon_linux" {
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["al2023-ami-*-kernel-6.1-arm64"] # or "al2023-ami-*-kernel-6.1-x86_64"
   }
 
   filter {
@@ -478,6 +478,7 @@ module "nlb_internal_tidb" {
 # API Gateway for export Grafana dashboard
 module "api_gateway_grafana" {
   source = "terraform-aws-modules/apigateway-v2/aws"
+  version = "5.2.1"
 
   name          = "${var.name_prefix}-api-gateway-grafana"
   description   = "HTTP API Gateway with VPC links"
@@ -489,22 +490,26 @@ module "api_gateway_grafana" {
     allow_origins = ["*"]
   }
 
-  create_api_domain_name = false
+  create_domain_name = false
 
-  integrations = {
+  routes = {
     "ANY /" = {
-      connection_type    = "VPC_LINK"
-      vpc_link           = "my-vpc"
-      integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[1]
-      integration_type   = "HTTP_PROXY"
-      integration_method = "ANY"
+      integration  = {
+         connection_type    = "VPC_LINK"
+         vpc_link_key       = "my-vpc"
+         uri    = module.nlb_internal_tidb.http_tcp_listener_arns[1]
+         type   = "HTTP_PROXY"
+         method = "ANY"
+      }
     },
     "ANY /{proxy+}" = {
-      connection_type    = "VPC_LINK"
-      vpc_link           = "my-vpc"
-      integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[1]
-      integration_type   = "HTTP_PROXY"
-      integration_method = "ANY"
+      integration  = {
+          connection_type    = "VPC_LINK"
+          vpc_link_key       = "my-vpc"
+          uri    = module.nlb_internal_tidb.http_tcp_listener_arns[1]
+          type   = "HTTP_PROXY"
+          method = "ANY"
+      }
     },
   }
 
@@ -521,6 +526,7 @@ module "api_gateway_grafana" {
 # API Gateway for export Grafana dashboard
 module "api_gateway_tidash" {
   source = "terraform-aws-modules/apigateway-v2/aws"
+  version = "5.2.1"
 
   name          = "${var.name_prefix}-api-gateway-tidash"
   description   = "HTTP API Gateway with VPC links"
@@ -532,22 +538,28 @@ module "api_gateway_tidash" {
     allow_origins = ["*"]
   }
 
-  create_api_domain_name = false
+  create_domain_name = false
 
-  integrations = {
+  routes = {
     "ANY /" = {
-      connection_type    = "VPC_LINK"
-      vpc_link           = "my-vpc"
-      integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[2]
-      integration_type   = "HTTP_PROXY"
-      integration_method = "ANY"
+      integration = {
+          connection_type    = "VPC_LINK"
+          # connection_id      = ""
+          vpc_link_key       = "my-vpc"
+
+          uri    = module.nlb_internal_tidb.http_tcp_listener_arns[2]
+          type   = "HTTP_PROXY"
+          method = "ANY"
+      }
     },
     "ANY /{proxy+}" = {
-      connection_type    = "VPC_LINK"
-      vpc_link           = "my-vpc"
-      integration_uri    = module.nlb_internal_tidb.http_tcp_listener_arns[2]
-      integration_type   = "HTTP_PROXY"
-      integration_method = "ANY"
+      integration = {
+          connection_type    = "VPC_LINK"
+          vpc_link_key           = "my-vpc"
+          uri    = module.nlb_internal_tidb.http_tcp_listener_arns[2]
+          type   = "HTTP_PROXY"
+          method = "ANY"
+      }
     },
   }
 

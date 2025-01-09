@@ -4,19 +4,19 @@
 variable "name_prefix" {
   type        = string
   default     = "tidb-test"
-  description = "Name prefix"
+  description = "tidb-test"
 }
 
 # aws region
 variable "aws_region" {
   type        = string
-  default     = "us-east-1"
+  default     = "ap-northeast-1"
   description = "AWS Region"
 }
 
 variable "aws_azs" {
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  default     = ["ap-northeast-1a", "ap-northeast-1c", "ap-northeast-1d"]
   description = "AWS Availability Zones"
 }
   
@@ -44,32 +44,32 @@ variable "aws_public_subnets" {
 
 variable "tidb_instance_type" {
  type    = string
- default = "c5.2xlarge" // on tidbcloud : 8C16G/c5.2xlarge , 16C32G/c5.4xlarge
+ default = "c6g.2xlarge" // on tidbcloud : 8C16G/c6.2xlarge , 16C32G/c6.4xlarge
 }
 
 variable "tikv_instance_type" {
   type    = string
-  default = "m5.2xlarge" // on tidbcloud : 8C32G/m5.2xlarge , 16C64G/m5.4xlarge
+  default = "m6g.2xlarge" // on tidbcloud : 8C32G/m6.2xlarge , 16C64G/m6.4xlarge
 }
 
 variable "pd_instance_type" {
   type    = string
-  default = "c5.xlarge" // on tidbcloud : 4C/c5.xlarge , 8C/c5.2xlarge
+  default = "c6g.xlarge" // on tidbcloud : 4C/c6.xlarge , 8C/c6.2xlarge
 }
 
 variable "monitor_instance_type" {
   type    = string
-  default = "t2.medium"
+  default = "t4g.medium"
 }
 
 variable "ticdc_instance_type" {
   type    = string
-  default = "t2.medium"
+  default = "t4g.medium"
 }
 
 variable "bastion_instance_type" {
   type    = string
-  default = "t2.medium"
+  default = "c6g.2xlarge"
 }
 
 ## servers disk 

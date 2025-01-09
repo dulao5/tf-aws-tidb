@@ -31,11 +31,11 @@ output "bastion_ip" {
 }
 
 output "grafana_url" {
-  value = "${module.api_gateway_grafana.apigatewayv2_api_api_endpoint}"
+  value = "${module.api_gateway_grafana.api_endpoint}"
 }
 
 output "tidash_url" {
-  value = "${module.api_gateway_tidash.apigatewayv2_api_api_endpoint}/dashboard/"
+  value = "${module.api_gateway_tidash.api_endpoint}/dashboard/"
 }
 
 # tidb_bastion keypair private key
